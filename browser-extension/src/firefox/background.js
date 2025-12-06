@@ -1,20 +1,9 @@
-browser.browserAction.onClicked.addListener((tab) => {
-    browser.tabs.insertCSS({code: 'body { cursor: crosshair !important; }'});
-    
-    // Listen for mouse click on the page
-    browser.tabs.executeScript(tab.id, {
-        code: `
-            document.addEventListener('click', function clickHandler(e) {
-                e.preventDefault();
-                document.body.style.cursor = 'default';
-                document.removeEventListener('click', clickHandler);
-                
-                browser.runtime.sendMessage({
-                    action: 'detectAI', 
-                    x: e.clientX, 
-                    y: e.clientY
-                });
-            }, {once: true});
-        `
-    });
+// AI Content Detection - Background Script
+browser.browserAction.onClicked.addListener(async (tab) => {
+    try {
+        await browser.tabs.sendMessage(tab.id, { action: 'toggle' });
+    } catch (err) {
+        // Content script might not be loaded yet, inject it first
+        console.error('Failed to send message:', err);
+    }
 });

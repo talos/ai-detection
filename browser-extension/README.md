@@ -1,49 +1,57 @@
 # AI Content Detection Browser Extension
 
-## Project Overview
-A browser extension that detects AI-generated content using the Sapling AI Detection API.
+Detect AI-generated content in web pages using the Sapling AI Detection API.
 
-## Current Implementation
+## Project Structure
 
-### Core Components
-- `src/core/ai_detection.js`: Core logic for API interaction and sentence mapping
-- `src/firefox/content_script.js`: Handles div selection, API call, and sentence highlighting
-- `src/firefox/background.js`: Manages browser toolbar activation
-- `src/firefox/manifest.json`: Firefox extension configuration
+```
+browser-extension/
+├── src/
+│   └── firefox/
+│       ├── manifest.json
+│       ├── background.js
+│       ├── content_script.js
+│       └── icon.svg
+└── README.md
+```
 
-### Functionality
-1. Browser toolbar button activates selection mode
-2. User clicks on a div to analyze
-3. Text content sent to Sapling API
-4. Sentences highlighted based on AI generation probability
-   - Red-to-green color gradient based on AI score
-5. Error handling with toast messages for API failures
+## Setup
 
-### Architectural Decisions
-- Hardcoded API key (temporary)
-- 5000 character limit for text analysis
-- Uses vanilla JavaScript for core logic
-- Designed to be browser-agnostic where possible
+1. **Set your API key**: Edit `src/firefox/content_script.js` and replace `YOUR_API_KEY_HERE` with your Sapling API key.
 
-### Pending Tasks
-1. Add icon
-2. Implement build/packaging process
-3. Add more robust error handling
-4. Implement API key management
-5. Cross-browser compatibility
+2. **Load in Firefox**:
+   - Open Firefox and go to `about:debugging`
+   - Click "This Firefox" in the sidebar
+   - Click "Load Temporary Add-on..."
+   - Select the `manifest.json` file from `src/firefox/`
 
-## Development Setup
-1. Load as temporary extension in Firefox
-2. Replace API key in `src/core/ai_detection.js`
+## Usage
 
-## Context Dump
-- Model used: Claude 3.5 Haiku
-- Date: 2025-12-06
-- Platform: Darwin
-- Project started: Browser extension for AI content detection
+1. Click the extension icon in the toolbar to activate selection mode
+2. Hover over elements to highlight them (blue outline)
+3. Click on an element to analyze its text content
+4. Sentences are highlighted on a gradient:
+   - **Red** = AI-generated (score near 0)
+   - **Green** = Human-written (score near 1)
+5. Hover over highlighted sentences to see the exact score
 
-## Next Steps
-- Refine highlighting mechanism
-- Add configuration options
-- Implement more sophisticated sentence detection
-- Create comprehensive testing suite
+## Limitations
+
+- Maximum 5000 characters per analysis
+- Requires Sapling API key
+- Currently Firefox only (Chrome support planned)
+
+## API Response Format
+
+The Sapling API returns:
+```json
+{
+  "score": 0.99,
+  "sentence_scores": [
+    {"sentence": "First sentence.", "score": 0.0},
+    {"sentence": "Second sentence.", "score": 0.95}
+  ]
+}
+```
+
+Where `score` is 0 (AI) to 1 (human).
