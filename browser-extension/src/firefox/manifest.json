@@ -1,0 +1,24 @@
+{
+    "manifest_version": 2,
+    "name": "AI Content Detector",
+    "version": "0.1.0",
+    "description": "Detect AI-generated content in web pages",
+    "icons": {
+        "48": "icon.png"
+    },
+    "permissions": [
+        "activeTab",
+        "https://api.sapling.ai/*"
+    ],
+    "browser_action": {
+        "default_icon": "icon.png",
+        "default_title": "Detect AI Content"
+    },
+    "background": {
+        "scripts": ["background.js"]
+    },
+    "content_scripts": [{
+        "matches": ["<all_urls>"],
+        "js": ["content_script.js"]
+    }]
+}
