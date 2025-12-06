@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>AI Content Detector Settings</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+      max-width: 400px;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: #4a90d9;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #3a7bc8;
+    }
+    .status {
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 4px;
+      display: none;
+    }
+    .status.success {
+      display: block;
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      display: block;
+      background: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</head>
+<body>
+  <h2>AI Content Detector</h2>
+  <label for="apiKey">Sapling API Key</label>
+  <input type="password" id="apiKey" placeholder="Enter your API key">
+  <button id="save">Save</button>
+  <div id="status" class="status"></div>
+
+  <hr style="margin: 24px 0;">
+
+  <h3>Logs</h3>
+  <p id="logCount" style="color: #666; font-size: 13px;">Loading...</p>
+  <button id="export">Export Logs (JSON)</button>
+  <button id="clear" style="background: #dc3545;">Clear Logs</button>
+
+  <script src="options.js"></script>
+</body>
+</html>

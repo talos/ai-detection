@@ -137,6 +137,8 @@
         element.style.outlineOffset = '';
     }
 
+    const MARK_CLASS = 'ai-detect-mark';
+
     function getScoreColor(score) {
         // score 0 = AI (red), score 1 = human (green)
         const red = Math.round(255 * (1 - score));
@@ -145,36 +147,81 @@
     }
 
     function highlightSentences(element, mappedSentences) {
-        const text = element.textContent;
+        const fullText = element.textContent;
 
-        // Build new HTML with highlighted sentences
-        let html = '';
-        let lastEnd = 0;
+        // Build a list of {start, end, score} relative to fullText
+        // We'll walk text nodes and wrap matching ranges
+        const ranges = mappedSentences.map(s => ({
+            start: s.start,
+            end: s.end,
+            score: s.score,
+            text: s.text
+        }));
 
-        for (const s of mappedSentences) {
-            // Text before this sentence
-            if (s.start > lastEnd) {
-                html += escapeHtml(text.slice(lastEnd, s.start));
+        let charOffset = 0;
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+
+        // Collect all text nodes first (modifying while walking is dangerous)
+        let node;
+        while ((node = walker.nextNode())) {
+            textNodes.push(node);
+        }
+
+        for (const textNode of textNodes) {
+            const nodeText = textNode.nodeValue;
+            const nodeStart = charOffset;
+            const nodeEnd = charOffset + nodeText.length;
+
+            // Find ranges that overlap this text node
+            const overlapping = ranges.filter(r => r.start < nodeEnd && r.end > nodeStart);
+
+            if (overlapping.length === 0) {
+                charOffset = nodeEnd;
+                continue;
             }
-            // The sentence with highlighting
-            const color = getScoreColor(s.score);
-            const scorePercent = Math.round(s.score * 100);
-            html += `<span style="background-color: ${color};" title="Human: ${scorePercent}%">${escapeHtml(s.text)}</span>`;
-            lastEnd = s.end;
-        }
 
-        // Remaining text
-        if (lastEnd < text.length) {
-            html += escapeHtml(text.slice(lastEnd));
-        }
+            // Split this text node according to overlapping ranges
+            const fragment = document.createDocumentFragment();
+            let pos = 0;
 
-        element.innerHTML = html;
+            for (const range of overlapping) {
+                const rangeStartInNode = Math.max(0, range.start - nodeStart);
+                const rangeEndInNode = Math.min(nodeText.length, range.end - nodeStart);
+
+                // Text before this range
+                if (rangeStartInNode > pos) {
+                    fragment.appendChild(document.createTextNode(nodeText.slice(pos, rangeStartInNode)));
+                }
+
+                // The highlighted range
+                const mark = document.createElement('mark');
+                mark.className = MARK_CLASS;
+                mark.style.backgroundColor = getScoreColor(range.score);
+                mark.style.color = 'inherit';
+                mark.title = `Human: ${Math.round(range.score * 100)}%`;
+                mark.textContent = nodeText.slice(rangeStartInNode, rangeEndInNode);
+                fragment.appendChild(mark);
+
+                pos = rangeEndInNode;
+            }
+
+            // Remaining text after last range
+            if (pos < nodeText.length) {
+                fragment.appendChild(document.createTextNode(nodeText.slice(pos)));
+            }
+
+            textNode.parentNode.replaceChild(fragment, textNode);
+            charOffset = nodeEnd;
+        }
     }
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+    function removeHighlights() {
+        const marks = document.querySelectorAll(`mark.${MARK_CLASS}`);
+        for (const mark of marks) {
+            const text = document.createTextNode(mark.textContent);
+            mark.parentNode.replaceChild(text, mark);
+        }
     }
 
     // ============ Event Handlers ============
@@ -269,11 +316,125 @@
     // ============ Message Listener ============
     browser.runtime.onMessage.addListener((message) => {
         if (message.action === 'toggle') {
-            if (isActive) {
+            // Check for selected text first
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+
+            if (selectedText) {
+                analyzeSelection(selection, selectedText);
+            } else if (isActive) {
                 deactivate();
             } else {
                 activate();
             }
         }
     });
+
+    async function analyzeSelection(selection, text) {
+        if (text.length > MAX_CHARS) {
+            showToast(`Text too long: ${text.length} chars (max ${MAX_CHARS})`, true);
+            return;
+        }
+
+        showLoader();
+
+        try {
+            const sentenceScores = await detectAIContent(text);
+
+            // Map sentences to positions within the selected text
+            const mapped = mapSentencesToPositions(text, sentenceScores);
+
+            // Get the range and highlight within it
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const container = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+                    ? range.commonAncestorContainer.parentElement
+                    : range.commonAncestorContainer;
+
+                // We need to work with the selection range, not the whole container
+                highlightRange(range, mapped, text);
+            }
+
+            hideLoader();
+            showToast(`Analyzed ${mapped.length} sentences`);
+            selection.removeAllRanges();
+        } catch (err) {
+            hideLoader();
+            showToast(err.message, true);
+        }
+    }
+
+    function highlightRange(range, mappedSentences, selectedText) {
+        // Create a document fragment from the range contents
+        const fragment = range.extractContents();
+        const wrapper = document.createElement('span');
+        wrapper.appendChild(fragment);
+
+        // Now highlight within this wrapper using the same logic
+        const ranges = mappedSentences.map(s => ({
+            start: s.start,
+            end: s.end,
+            score: s.score
+        }));
+
+        let charOffset = 0;
+        const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
+        const textNodes = [];
+
+        let node;
+        while ((node = walker.nextNode())) {
+            textNodes.push(node);
+        }
+
+        for (const textNode of textNodes) {
+            const nodeText = textNode.nodeValue;
+            const nodeStart = charOffset;
+            const nodeEnd = charOffset + nodeText.length;
+
+            const overlapping = ranges.filter(r => r.start < nodeEnd && r.end > nodeStart);
+
+            if (overlapping.length === 0) {
+                charOffset = nodeEnd;
+                continue;
+            }
+
+            const frag = document.createDocumentFragment();
+            let pos = 0;
+
+            for (const r of overlapping) {
+                const rangeStartInNode = Math.max(0, r.start - nodeStart);
+                const rangeEndInNode = Math.min(nodeText.length, r.end - nodeStart);
+
+                if (rangeStartInNode > pos) {
+                    frag.appendChild(document.createTextNode(nodeText.slice(pos, rangeStartInNode)));
+                }
+
+                const mark = document.createElement('mark');
+                mark.className = MARK_CLASS;
+                mark.style.backgroundColor = getScoreColor(r.score);
+                mark.style.color = 'inherit';
+                mark.title = `Human: ${Math.round(r.score * 100)}%`;
+                mark.textContent = nodeText.slice(rangeStartInNode, rangeEndInNode);
+                frag.appendChild(mark);
+
+                pos = rangeEndInNode;
+            }
+
+            if (pos < nodeText.length) {
+                frag.appendChild(document.createTextNode(nodeText.slice(pos)));
+            }
+
+            textNode.parentNode.replaceChild(frag, textNode);
+            charOffset = nodeEnd;
+        }
+
+        // Insert the highlighted content back
+        range.insertNode(wrapper);
+
+        // Unwrap the span, leaving just its contents
+        while (wrapper.firstChild) {
+            wrapper.parentNode.insertBefore(wrapper.firstChild, wrapper);
+        }
+        wrapper.remove();
+    }
 })();
