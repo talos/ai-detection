@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 12px;
+      min-width: 200px;
+      margin: 0;
+    }
+    .field {
+      margin-bottom: 12px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 8px;
+      font-size: 13px;
+      background: #4a90d9;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #3a7bc8;
+    }
+    .status {
+      margin-top: 8px;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      text-align: center;
+      display: none;
+    }
+    .status.error {
+      display: block;
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .settings-link {
+      display: block;
+      margin-top: 12px;
+      text-align: center;
+      font-size: 11px;
+      color: #666;
+    }
+    .settings-link a {
+      color: #4a90d9;
+    }
+  </style>
+</head>
+<body>
+  <div class="field">
+    <label>Provider</label>
+    <select id="provider"></select>
+  </div>
+
+  <button id="analyze">Analyze Selection</button>
+  <div id="status" class="status"></div>
+
+  <div class="settings-link">
+    <a href="#" id="openSettings">API Keys & Logs</a>
+  </div>
+
+  <script src="providers.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

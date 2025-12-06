@@ -51,18 +51,30 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         detectAIContent(message.text)
             .then(result => {
                 logResult(url, message.text, result.sentences, result.providerId);
-                sendResponse({ success: true, data: result.sentences });
+                sendResponse({
+                    success: true,
+                    data: result.sentences,
+                    providerId: result.providerId,
+                    providerName: result.providerName
+                });
             })
             .catch(err => sendResponse({ success: false, error: err.message }));
         return true;
     } else if (message.action === 'getProviders') {
         sendResponse(getProviderList());
+    } else if (message.action === 'getActiveProvider') {
+        // Return current provider info for UI display
+        browser.storage.local.get(['providerId']).then(storage => {
+            const providerId = storage.providerId || 'sapling';
+            const provider = getProvider(providerId);
+            sendResponse({ providerId, providerName: provider.name });
+        });
+        return true;
     }
 });
 
-browser.browserAction.onClicked.addListener((tab) => {
-    browser.tabs.sendMessage(tab.id, { action: 'toggle' });
-});
+// Note: browserAction.onClicked doesn't fire when popup is defined
+// The popup.js handles triggering analysis via message passing
 
 async function detectAIContent(text) {
     const storage = await browser.storage.local.get(['providerId', 'apiKeys']);
@@ -87,5 +99,5 @@ async function detectAIContent(text) {
     const json = await response.json();
     const sentences = provider.parseResponse(json);
 
-    return { sentences, providerId };
+    return { sentences, providerId, providerName: provider.name };
 }

@@ -10,6 +10,11 @@
     let hoveredElement = null;
 
     // ============ API Functions ============
+    async function getActiveProvider() {
+        const response = await browser.runtime.sendMessage({ action: 'getActiveProvider' });
+        return response;
+    }
+
     async function detectAIContent(text) {
         if (text.length > MAX_CHARS) {
             throw new Error(`Text exceeds ${MAX_CHARS} character limit (got ${text.length})`);
@@ -24,7 +29,10 @@
             throw new Error(response.error);
         }
 
-        return response.data;
+        return {
+            sentences: response.data,
+            providerName: response.providerName
+        };
     }
 
     function mapSentencesToPositions(text, sentenceScores) {
@@ -74,9 +82,10 @@
         setTimeout(() => toast.remove(), 4000);
     }
 
-    function showLoader(element) {
+    function showLoader(providerName) {
         const loader = document.createElement('div');
         loader.id = 'ai-detect-loader';
+        const displayName = providerName || 'AI detector';
         loader.innerHTML = `
             <div style="
                 display: flex;
@@ -97,7 +106,7 @@
                     border-radius: 50%;
                     animation: ai-detect-spin 1s linear infinite;
                 "></div>
-                Analyzing text...
+                Analyzing with ${displayName}...
             </div>
         `;
 
@@ -270,15 +279,16 @@
         // Deactivate selection mode
         deactivate();
 
-        // Show loader
-        showLoader(target);
+        // Get provider info and show loader
+        const providerInfo = await getActiveProvider();
+        showLoader(providerInfo.providerName);
 
         try {
-            const sentenceScores = await detectAIContent(text);
-            const mapped = mapSentencesToPositions(text, sentenceScores);
+            const result = await detectAIContent(text);
+            const mapped = mapSentencesToPositions(text, result.sentences);
             hideLoader();
             highlightSentences(target, mapped);
-            showToast(`Analyzed ${mapped.length} sentences`);
+            showToast(`Analyzed ${mapped.length} sentences via ${result.providerName}`);
         } catch (err) {
             hideLoader();
             showToast(err.message, true);
@@ -336,13 +346,15 @@
             return;
         }
 
-        showLoader();
+        // Get provider info and show loader
+        const providerInfo = await getActiveProvider();
+        showLoader(providerInfo.providerName);
 
         try {
-            const sentenceScores = await detectAIContent(text);
+            const result = await detectAIContent(text);
 
             // Map sentences to positions within the selected text
-            const mapped = mapSentencesToPositions(text, sentenceScores);
+            const mapped = mapSentencesToPositions(text, result.sentences);
 
             // Get the range and highlight within it
             if (selection.rangeCount > 0) {
@@ -356,7 +368,7 @@
             }
 
             hideLoader();
-            showToast(`Analyzed ${mapped.length} sentences`);
+            showToast(`Analyzed ${mapped.length} sentences via ${result.providerName}`);
             selection.removeAllRanges();
         } catch (err) {
             hideLoader();

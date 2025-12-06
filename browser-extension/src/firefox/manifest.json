@@ -2,18 +2,20 @@
     "manifest_version": 2,
     "name": "AI Content Detector",
     "version": "0.1.0",
-    "description": "Detect AI-generated content in web pages using Sapling AI",
+    "description": "Detect AI-generated content in web pages",
     "icons": {
         "48": "icon.svg"
     },
     "permissions": [
         "activeTab",
         "storage",
-        "https://api.sapling.ai/*"
+        "https://api.sapling.ai/*",
+        "https://api.gptzero.me/*"
     ],
     "browser_action": {
         "default_icon": "icon.svg",
-        "default_title": "Detect AI Content"
+        "default_title": "Detect AI Content",
+        "default_popup": "popup.html"
     },
     "background": {
         "scripts": ["providers.js", "background.js"]
