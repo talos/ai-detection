@@ -7,14 +7,14 @@
     body {
       font-family: system-ui, sans-serif;
       padding: 20px;
-      max-width: 400px;
+      max-width: 450px;
     }
     label {
       display: block;
       margin-bottom: 6px;
       font-weight: 500;
     }
-    input {
+    input, select {
       width: 100%;
       padding: 8px;
       font-size: 14px;
@@ -22,8 +22,12 @@
       border-radius: 4px;
       box-sizing: border-box;
     }
+    .field {
+      margin-bottom: 16px;
+    }
     button {
       margin-top: 12px;
+      margin-right: 8px;
       padding: 8px 16px;
       background: #4a90d9;
       color: white;
@@ -33,6 +37,12 @@
     }
     button:hover {
       background: #3a7bc8;
+    }
+    button.danger {
+      background: #dc3545;
+    }
+    button.danger:hover {
+      background: #c82333;
     }
     .status {
       margin-top: 12px;
@@ -50,22 +60,40 @@
       background: #f8d7da;
       color: #721c24;
     }
+    hr {
+      margin: 24px 0;
+      border: none;
+      border-top: 1px solid #ddd;
+    }
+    h3 {
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
   <h2>AI Content Detector</h2>
-  <label for="apiKey">Sapling API Key</label>
-  <input type="password" id="apiKey" placeholder="Enter your API key">
+
+  <div class="field">
+    <label for="provider">Provider</label>
+    <select id="provider"></select>
+  </div>
+
+  <div class="field">
+    <label for="apiKey">API Key</label>
+    <input type="password" id="apiKey" placeholder="Enter API key">
+  </div>
+
   <button id="save">Save</button>
   <div id="status" class="status"></div>
 
-  <hr style="margin: 24px 0;">
+  <hr>
 
   <h3>Logs</h3>
   <p id="logCount" style="color: #666; font-size: 13px;">Loading...</p>
   <button id="export">Export Logs (JSON)</button>
-  <button id="clear" style="background: #dc3545;">Clear Logs</button>
+  <button id="clear" class="danger">Clear Logs</button>
 
+  <script src="providers.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

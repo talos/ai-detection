@@ -2,6 +2,8 @@ const DB_NAME = 'ai-detect-logs';
 const DB_VERSION = 1;
 
 let db = null;
+let currentProviderId = 'sapling';
+let apiKeys = {};
 
 async function openDB() {
     if (db) return db;
@@ -52,17 +54,37 @@ async function updateLogCount() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const providerSelect = document.getElementById('provider');
     const apiKeyInput = document.getElementById('apiKey');
     const saveButton = document.getElementById('save');
     const status = document.getElementById('status');
     const exportButton = document.getElementById('export');
     const clearButton = document.getElementById('clear');
 
-    // Load existing key
-    const { saplingApiKey } = await browser.storage.local.get('saplingApiKey');
-    if (saplingApiKey) {
-        apiKeyInput.value = saplingApiKey;
+    // Populate provider dropdown
+    const providerList = getProviderList();
+    for (const p of providerList) {
+        const option = document.createElement('option');
+        option.value = p.id;
+        option.textContent = p.name;
+        providerSelect.appendChild(option);
     }
+
+    // Load saved settings
+    const storage = await browser.storage.local.get(['providerId', 'apiKeys']);
+    currentProviderId = storage.providerId || 'sapling';
+    apiKeys = storage.apiKeys || {};
+
+    providerSelect.value = currentProviderId;
+    apiKeyInput.value = apiKeys[currentProviderId] || '';
+    apiKeyInput.placeholder = getProvider(currentProviderId).keyPlaceholder || 'Enter API key';
+
+    // Update API key field when provider changes
+    providerSelect.addEventListener('change', () => {
+        currentProviderId = providerSelect.value;
+        apiKeyInput.value = apiKeys[currentProviderId] || '';
+        apiKeyInput.placeholder = getProvider(currentProviderId).keyPlaceholder || 'Enter API key';
+    });
 
     // Load log count
     await updateLogCount();
@@ -75,7 +97,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        await browser.storage.local.set({ saplingApiKey: key });
+        apiKeys[currentProviderId] = key;
+
+        await browser.storage.local.set({
+            providerId: currentProviderId,
+            apiKeys: apiKeys
+        });
+
         status.textContent = 'Saved!';
         status.className = 'status success';
         setTimeout(() => { status.className = 'status'; }, 2000);

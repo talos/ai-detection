@@ -16,7 +16,7 @@
         "default_title": "Detect AI Content"
     },
     "background": {
-        "scripts": ["background.js"]
+        "scripts": ["providers.js", "background.js"]
     },
     "content_scripts": [{
         "matches": ["<all_urls>"],
