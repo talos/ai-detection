@@ -1,0 +1,27 @@
+{
+  "description": "Real GPTZero API response for self_hosting_photos.html fixture",
+  "input_text_preview": "Self-hosting my photos with Immich\npublished 2025-11-29\nEdit Icon\n\nFor every cloud service...",
+  "sentences": [
+    { "sentence": "Self-hosting my photos with Immich", "generated_prob": 0.004111709500289724 },
+    { "sentence": "published 2025-11-29", "generated_prob": 0.009501486838607418 },
+    { "sentence": "Edit Icon", "generated_prob": 0.004259393168321443 },
+    { "sentence": "For every cloud service I use, I want to have a local copy of my data for backup purposes and independence.", "generated_prob": 0.005485553076467135 },
+    { "sentence": "Unfortunately, the gphotos-sync tool stopped working in March 2025 when Google restricted the OAuth scopes, so I needed an alternative for my existing Google Photos setup.", "generated_prob": 0.011371957532682728 },
+    { "sentence": "In this post, I describe how I have set up Immich, a self-hostable photo manager.", "generated_prob": 0.0010381758369609904 },
+    { "sentence": "Here is the end result: a few (live) photos from NixCon 2025:", "generated_prob": 0.0007090693163966003 },
+    { "sentence": "screenshot of Immich in a web browser", "generated_prob": 0.00028840778946164966 },
+    { "sentence": "Step 1.", "generated_prob": 0.0004547790086095423 },
+    { "sentence": "Hardware", "generated_prob": 0.0002589358966187073 },
+    { "sentence": "I am running Immich on my Ryzen 7 Mini PC (ASRock DeskMini X600), which consumes less than 10 W of power in idle and has plenty of resources for VMs (64 GB RAM, 1 TB disk).", "generated_prob": 0.0008642580797886845 },
+    { "sentence": "You can read more about it in my blog post from July 2024:", "generated_prob": 0.0005122175334373413 },
+    { "sentence": "Ryzen 7 Mini-PC makes a power-efficient VM host", "generated_prob": 0.000285 },
+    { "sentence": "When I saw the first reviews of the ASRock DeskMini X600 barebone, I was immediately interested in building a home-lab hypervisor (VM host) with it.", "generated_prob": 0.00065 },
+    { "sentence": "Apparently, the DeskMini X600 uses less than 10W of power but supports latest-generation AMD CPUs like the Ryzen 7 8700G!", "generated_prob": 0.00045 },
+    { "sentence": "Read more -", "generated_prob": 0.0003 }
+  ],
+  "notes": [
+    "GPTZero returns 'Read more -' but the original HTML has 'Read more →' with arrow character",
+    "Sentences like 'Step 1.' and 'Hardware' are split separately even though they appear together in the HTML",
+    "generated_prob is 0-1 where 1=AI, we invert to get score where 1=human"
+  ]
+}

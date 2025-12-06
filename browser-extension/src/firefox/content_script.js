@@ -2,17 +2,13 @@
 (function() {
     'use strict';
 
-    // ============ Configuration ============
     const MAX_CHARS = 20000;
-
-    // ============ State ============
     let isActive = false;
     let hoveredElement = null;
 
     // ============ API Functions ============
     async function getActiveProvider() {
-        const response = await browser.runtime.sendMessage({ action: 'getActiveProvider' });
-        return response;
+        return await browser.runtime.sendMessage({ action: 'getActiveProvider' });
     }
 
     async function detectAIContent(text) {
@@ -33,28 +29,6 @@
             sentences: response.data,
             providerName: response.providerName
         };
-    }
-
-    function mapSentencesToPositions(text, sentenceScores) {
-        const mapped = [];
-        let searchStart = 0;
-
-        for (const item of sentenceScores) {
-            const sentence = item.sentence;
-            const idx = text.indexOf(sentence, searchStart);
-
-            if (idx !== -1) {
-                mapped.push({
-                    text: sentence,
-                    score: item.score,
-                    start: idx,
-                    end: idx + sentence.length
-                });
-                searchStart = idx + sentence.length;
-            }
-        }
-
-        return mapped;
     }
 
     // ============ UI Functions ============
@@ -85,7 +59,6 @@
     function showLoader(providerName) {
         const loader = document.createElement('div');
         loader.id = 'ai-detect-loader';
-        const displayName = providerName || 'AI detector';
         loader.innerHTML = `
             <div style="
                 display: flex;
@@ -106,28 +79,18 @@
                     border-radius: 50%;
                     animation: ai-detect-spin 1s linear infinite;
                 "></div>
-                Analyzing with ${displayName}...
+                Analyzing with ${providerName || 'AI detector'}...
             </div>
         `;
 
-        // Add keyframes if not present
         if (!document.getElementById('ai-detect-styles')) {
             const style = document.createElement('style');
             style.id = 'ai-detect-styles';
-            style.textContent = `
-                @keyframes ai-detect-spin {
-                    to { transform: rotate(360deg); }
-                }
-            `;
+            style.textContent = `@keyframes ai-detect-spin { to { transform: rotate(360deg); } }`;
             document.head.appendChild(style);
         }
 
-        loader.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 2147483647;
-        `;
+        loader.style.cssText = `position: fixed; top: 20px; right: 20px; z-index: 2147483647;`;
         document.body.appendChild(loader);
     }
 
@@ -136,6 +99,275 @@
         if (loader) loader.remove();
     }
 
+    // ============ Modal Functions ============
+    function showModal(result, text) {
+        // Remove existing modal
+        const existing = document.getElementById('ai-detect-modal');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'ai-detect-modal';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2147483647;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: system-ui, -apple-system, sans-serif;
+        `;
+
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            width: 90%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        `;
+
+        // Header
+        const header = document.createElement('div');
+        header.style.cssText = `
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        header.innerHTML = `
+            <div>
+                <h2 style="margin: 0; font-size: 18px; color: #333;">AI Detection Results</h2>
+                <p style="margin: 4px 0 0; font-size: 13px; color: #666;">Provider: ${result.providerName} | ${result.sentences.length} sentences analyzed</p>
+            </div>
+        `;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '×';
+        closeBtn.style.cssText = `
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+            padding: 0 8px;
+            line-height: 1;
+        `;
+        closeBtn.onclick = () => overlay.remove();
+        header.appendChild(closeBtn);
+
+        // Content
+        const content = document.createElement('div');
+        content.style.cssText = `
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        `;
+
+        // Summary stats
+        const avgScore = result.sentences.reduce((sum, s) => sum + s.score, 0) / result.sentences.length;
+        const summary = document.createElement('div');
+        summary.style.cssText = `
+            background: #f5f5f5;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        `;
+        summary.innerHTML = `
+            <div style="display: flex; gap: 24px; font-size: 14px;">
+                <div><strong>Average Human Score:</strong> ${(avgScore * 100).toFixed(1)}%</div>
+                <div><strong>Characters:</strong> ${text.length}</div>
+            </div>
+        `;
+        content.appendChild(summary);
+
+        // Sentences list
+        const list = document.createElement('div');
+        list.style.cssText = `display: flex; flex-direction: column; gap: 8px;`;
+
+        for (const s of result.sentences) {
+            const item = document.createElement('div');
+            item.style.cssText = `
+                padding: 12px;
+                border-radius: 6px;
+                border: 1px solid #e0e0e0;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+            `;
+
+            const scoreColor = s.score > 0.7 ? '#28a745' : s.score > 0.4 ? '#ffc107' : '#dc3545';
+            const scoreLabel = s.score > 0.7 ? 'Human' : s.score > 0.4 ? 'Mixed' : 'AI';
+
+            item.innerHTML = `
+                <div style="
+                    min-width: 60px;
+                    padding: 4px 8px;
+                    background: ${scoreColor};
+                    color: white;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    text-align: center;
+                ">${(s.score * 100).toFixed(0)}%<br><span style="font-weight: normal; font-size: 10px;">${scoreLabel}</span></div>
+                <div style="flex: 1; font-size: 14px; color: #333; line-height: 1.5;">${escapeHtml(s.sentence)}</div>
+            `;
+            list.appendChild(item);
+        }
+        content.appendChild(list);
+
+        // Footer with raw JSON toggle
+        const footer = document.createElement('div');
+        footer.style.cssText = `
+            padding: 12px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 12px;
+        `;
+
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = 'Copy JSON';
+        copyBtn.style.cssText = `
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = 'Copy JSON', 2000);
+        };
+
+        const viewRawBtn = document.createElement('button');
+        viewRawBtn.textContent = 'View Raw JSON';
+        viewRawBtn.style.cssText = `
+            padding: 8px 16px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+
+        let showingRaw = false;
+        viewRawBtn.onclick = () => {
+            showingRaw = !showingRaw;
+            if (showingRaw) {
+                list.innerHTML = `<pre style="
+                    background: #1e1e1e;
+                    color: #d4d4d4;
+                    padding: 16px;
+                    border-radius: 8px;
+                    overflow-x: auto;
+                    font-size: 13px;
+                    margin: 0;
+                ">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+                viewRawBtn.textContent = 'View Sentences';
+            } else {
+                // Rebuild sentences view
+                list.innerHTML = '';
+                for (const s of result.sentences) {
+                    const item = document.createElement('div');
+                    item.style.cssText = `
+                        padding: 12px;
+                        border-radius: 6px;
+                        border: 1px solid #e0e0e0;
+                        display: flex;
+                        gap: 12px;
+                        align-items: flex-start;
+                    `;
+                    const scoreColor = s.score > 0.7 ? '#28a745' : s.score > 0.4 ? '#ffc107' : '#dc3545';
+                    const scoreLabel = s.score > 0.7 ? 'Human' : s.score > 0.4 ? 'Mixed' : 'AI';
+                    item.innerHTML = `
+                        <div style="
+                            min-width: 60px;
+                            padding: 4px 8px;
+                            background: ${scoreColor};
+                            color: white;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: 600;
+                            text-align: center;
+                        ">${(s.score * 100).toFixed(0)}%<br><span style="font-weight: normal; font-size: 10px;">${scoreLabel}</span></div>
+                        <div style="flex: 1; font-size: 14px; color: #333; line-height: 1.5;">${escapeHtml(s.sentence)}</div>
+                    `;
+                    list.appendChild(item);
+                }
+                viewRawBtn.textContent = 'View Raw JSON';
+            }
+        };
+
+        footer.appendChild(copyBtn);
+        footer.appendChild(viewRawBtn);
+
+        modal.appendChild(header);
+        modal.appendChild(content);
+        modal.appendChild(footer);
+        overlay.appendChild(modal);
+
+        // Close on overlay click
+        overlay.onclick = (e) => {
+            if (e.target === overlay) overlay.remove();
+        };
+
+        // Close on Escape
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                overlay.remove();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+
+        document.body.appendChild(overlay);
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ============ Analysis Function ============
+    async function analyzeText(text) {
+        const trimmedText = text.trim();
+
+        if (!trimmedText) {
+            showToast('No text content to analyze', true);
+            return;
+        }
+
+        if (trimmedText.length > MAX_CHARS) {
+            showToast(`Text too long: ${trimmedText.length} chars (max ${MAX_CHARS})`, true);
+            return;
+        }
+
+        const providerInfo = await getActiveProvider();
+        showLoader(providerInfo.providerName);
+
+        try {
+            const result = await detectAIContent(trimmedText);
+            hideLoader();
+            showModal(result, trimmedText);
+        } catch (err) {
+            hideLoader();
+            showToast(err.message, true);
+        }
+    }
+
+    // ============ Event Handlers ============
     function highlightElement(element) {
         element.style.outline = '3px solid #007bff';
         element.style.outlineOffset = '2px';
@@ -146,111 +378,18 @@
         element.style.outlineOffset = '';
     }
 
-    const MARK_CLASS = 'ai-detect-mark';
-
-    function getScoreColor(score) {
-        // score 0 = AI (red), score 1 = human (green)
-        const red = Math.round(255 * (1 - score));
-        const green = Math.round(255 * score);
-        return `rgba(${red}, ${green}, 0, 0.35)`;
-    }
-
-    function highlightSentences(element, mappedSentences) {
-        const fullText = element.textContent;
-
-        // Build a list of {start, end, score} relative to fullText
-        // We'll walk text nodes and wrap matching ranges
-        const ranges = mappedSentences.map(s => ({
-            start: s.start,
-            end: s.end,
-            score: s.score,
-            text: s.text
-        }));
-
-        let charOffset = 0;
-        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-        const textNodes = [];
-
-        // Collect all text nodes first (modifying while walking is dangerous)
-        let node;
-        while ((node = walker.nextNode())) {
-            textNodes.push(node);
-        }
-
-        for (const textNode of textNodes) {
-            const nodeText = textNode.nodeValue;
-            const nodeStart = charOffset;
-            const nodeEnd = charOffset + nodeText.length;
-
-            // Find ranges that overlap this text node
-            const overlapping = ranges.filter(r => r.start < nodeEnd && r.end > nodeStart);
-
-            if (overlapping.length === 0) {
-                charOffset = nodeEnd;
-                continue;
-            }
-
-            // Split this text node according to overlapping ranges
-            const fragment = document.createDocumentFragment();
-            let pos = 0;
-
-            for (const range of overlapping) {
-                const rangeStartInNode = Math.max(0, range.start - nodeStart);
-                const rangeEndInNode = Math.min(nodeText.length, range.end - nodeStart);
-
-                // Text before this range
-                if (rangeStartInNode > pos) {
-                    fragment.appendChild(document.createTextNode(nodeText.slice(pos, rangeStartInNode)));
-                }
-
-                // The highlighted range
-                const mark = document.createElement('mark');
-                mark.className = MARK_CLASS;
-                mark.style.backgroundColor = getScoreColor(range.score);
-                mark.style.color = 'inherit';
-                mark.title = `Human: ${Math.round(range.score * 100)}%`;
-                mark.textContent = nodeText.slice(rangeStartInNode, rangeEndInNode);
-                fragment.appendChild(mark);
-
-                pos = rangeEndInNode;
-            }
-
-            // Remaining text after last range
-            if (pos < nodeText.length) {
-                fragment.appendChild(document.createTextNode(nodeText.slice(pos)));
-            }
-
-            textNode.parentNode.replaceChild(fragment, textNode);
-            charOffset = nodeEnd;
-        }
-    }
-
-    function removeHighlights() {
-        const marks = document.querySelectorAll(`mark.${MARK_CLASS}`);
-        for (const mark of marks) {
-            const text = document.createTextNode(mark.textContent);
-            mark.parentNode.replaceChild(text, mark);
-        }
-    }
-
-    // ============ Event Handlers ============
     function onMouseOver(e) {
         if (!isActive) return;
-
         const target = e.target;
         if (target === hoveredElement) return;
 
-        if (hoveredElement) {
-            unhighlightElement(hoveredElement);
-        }
-
+        if (hoveredElement) unhighlightElement(hoveredElement);
         hoveredElement = target;
         highlightElement(target);
     }
 
     function onMouseOut(e) {
         if (!isActive) return;
-
         if (hoveredElement) {
             unhighlightElement(hoveredElement);
             hoveredElement = null;
@@ -259,59 +398,29 @@
 
     async function onClick(e) {
         if (!isActive) return;
-
         e.preventDefault();
         e.stopPropagation();
 
-        const target = e.target;
-        const text = target.textContent.trim();
-
-        if (!text) {
-            showToast('No text content in selected element', true);
-            return;
-        }
-
-        if (text.length > MAX_CHARS) {
-            showToast(`Text too long: ${text.length} chars (max ${MAX_CHARS})`, true);
-            return;
-        }
-
-        // Deactivate selection mode
         deactivate();
 
-        // Get provider info and show loader
-        const providerInfo = await getActiveProvider();
-        showLoader(providerInfo.providerName);
-
-        try {
-            const result = await detectAIContent(text);
-            const mapped = mapSentencesToPositions(text, result.sentences);
-            hideLoader();
-            highlightSentences(target, mapped);
-            showToast(`Analyzed ${mapped.length} sentences via ${result.providerName}`);
-        } catch (err) {
-            hideLoader();
-            showToast(err.message, true);
-        }
+        const text = e.target.textContent;
+        await analyzeText(text);
     }
 
     // ============ Activation ============
     function activate() {
         if (isActive) return;
         isActive = true;
-
         document.body.style.cursor = 'crosshair';
         document.addEventListener('mouseover', onMouseOver, true);
         document.addEventListener('mouseout', onMouseOut, true);
         document.addEventListener('click', onClick, true);
-
         showToast('Click on an element to analyze');
     }
 
     function deactivate() {
         if (!isActive) return;
         isActive = false;
-
         document.body.style.cursor = '';
         document.removeEventListener('mouseover', onMouseOver, true);
         document.removeEventListener('mouseout', onMouseOut, true);
@@ -324,14 +433,15 @@
     }
 
     // ============ Message Listener ============
-    browser.runtime.onMessage.addListener((message) => {
+    browser.runtime.onMessage.addListener(async (message) => {
         if (message.action === 'toggle') {
-            // Check for selected text first
             const selection = window.getSelection();
-            const selectedText = selection.toString().trim();
 
-            if (selectedText) {
-                analyzeSelection(selection, selectedText);
+            if (selection.rangeCount > 0 && selection.toString().trim()) {
+                // User has text selected - analyze the selection
+                const text = selection.toString();
+                await analyzeText(text);
+                selection.removeAllRanges();
             } else if (isActive) {
                 deactivate();
             } else {
@@ -339,114 +449,4 @@
             }
         }
     });
-
-    async function analyzeSelection(selection, text) {
-        if (text.length > MAX_CHARS) {
-            showToast(`Text too long: ${text.length} chars (max ${MAX_CHARS})`, true);
-            return;
-        }
-
-        // Get provider info and show loader
-        const providerInfo = await getActiveProvider();
-        showLoader(providerInfo.providerName);
-
-        try {
-            const result = await detectAIContent(text);
-
-            // Map sentences to positions within the selected text
-            const mapped = mapSentencesToPositions(text, result.sentences);
-
-            // Get the range and highlight within it
-            if (selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0);
-                const container = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
-                    ? range.commonAncestorContainer.parentElement
-                    : range.commonAncestorContainer;
-
-                // We need to work with the selection range, not the whole container
-                highlightRange(range, mapped, text);
-            }
-
-            hideLoader();
-            showToast(`Analyzed ${mapped.length} sentences via ${result.providerName}`);
-            selection.removeAllRanges();
-        } catch (err) {
-            hideLoader();
-            showToast(err.message, true);
-        }
-    }
-
-    function highlightRange(range, mappedSentences, selectedText) {
-        // Create a document fragment from the range contents
-        const fragment = range.extractContents();
-        const wrapper = document.createElement('span');
-        wrapper.appendChild(fragment);
-
-        // Now highlight within this wrapper using the same logic
-        const ranges = mappedSentences.map(s => ({
-            start: s.start,
-            end: s.end,
-            score: s.score
-        }));
-
-        let charOffset = 0;
-        const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT);
-        const textNodes = [];
-
-        let node;
-        while ((node = walker.nextNode())) {
-            textNodes.push(node);
-        }
-
-        for (const textNode of textNodes) {
-            const nodeText = textNode.nodeValue;
-            const nodeStart = charOffset;
-            const nodeEnd = charOffset + nodeText.length;
-
-            const overlapping = ranges.filter(r => r.start < nodeEnd && r.end > nodeStart);
-
-            if (overlapping.length === 0) {
-                charOffset = nodeEnd;
-                continue;
-            }
-
-            const frag = document.createDocumentFragment();
-            let pos = 0;
-
-            for (const r of overlapping) {
-                const rangeStartInNode = Math.max(0, r.start - nodeStart);
-                const rangeEndInNode = Math.min(nodeText.length, r.end - nodeStart);
-
-                if (rangeStartInNode > pos) {
-                    frag.appendChild(document.createTextNode(nodeText.slice(pos, rangeStartInNode)));
-                }
-
-                const mark = document.createElement('mark');
-                mark.className = MARK_CLASS;
-                mark.style.backgroundColor = getScoreColor(r.score);
-                mark.style.color = 'inherit';
-                mark.title = `Human: ${Math.round(r.score * 100)}%`;
-                mark.textContent = nodeText.slice(rangeStartInNode, rangeEndInNode);
-                frag.appendChild(mark);
-
-                pos = rangeEndInNode;
-            }
-
-            if (pos < nodeText.length) {
-                frag.appendChild(document.createTextNode(nodeText.slice(pos)));
-            }
-
-            textNode.parentNode.replaceChild(frag, textNode);
-            charOffset = nodeEnd;
-        }
-
-        // Insert the highlighted content back
-        range.insertNode(wrapper);
-
-        // Unwrap the span, leaving just its contents
-        while (wrapper.firstChild) {
-            wrapper.parentNode.insertBefore(wrapper.firstChild, wrapper);
-        }
-        wrapper.remove();
-    }
 })();

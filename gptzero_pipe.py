@@ -59,7 +59,7 @@ async def send_to_gptzero(text: str) -> str:
 
                     # Parse and log response
                     result: Any = await response.json()
-                    logging.info(f"GPTZero API response: {json.dumps(result)}")
+                    logging.info(f"GPTZero API response: {json.dumps(result, indent=2)}")
                     return json.dumps(result, indent=2)
             except aiohttp.ClientResponseError as e:
                 error_msg: str = f"API response error: {e}"
