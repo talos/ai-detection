@@ -3,9 +3,7 @@
     'use strict';
 
     // ============ Configuration ============
-    const SAPLING_API_KEY = 'BNUHLNNRCK23AU2MKO6WW5DPFSQW4JBD';
-    const SAPLING_API_ENDPOINT = 'https://api.sapling.ai/api/v1/aidetect';
-    const MAX_CHARS = 5000;
+    const MAX_CHARS = 20000;
 
     // ============ State ============
     let isActive = false;
@@ -17,25 +15,16 @@
             throw new Error(`Text exceeds ${MAX_CHARS} character limit (got ${text.length})`);
         }
 
-        const response = await fetch(SAPLING_API_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                key: SAPLING_API_KEY,
-                text: text,
-                session_id: 'browser_extension'
-            })
+        const response = await browser.runtime.sendMessage({
+            action: 'detectAI',
+            text: text
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API error ${response.status}: ${errorText}`);
+        if (!response.success) {
+            throw new Error(response.error);
         }
 
-        const result = await response.json();
-        return result.sentence_scores || [];
+        return response.data;
     }
 
     function mapSentencesToPositions(text, sentenceScores) {
