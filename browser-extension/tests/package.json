@@ -1,0 +1,13 @@
+{
+  "name": "ai-detection-browser-extension-tests",
+  "version": "1.0.0",
+  "description": "Tests for AI detection browser extension",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  }
+}
