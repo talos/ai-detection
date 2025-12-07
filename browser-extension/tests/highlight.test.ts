@@ -253,4 +253,90 @@ describe('Sentence Location in HTML', () => {
             });
         });
     });
+
+    describe('repeated word handling', () => {
+        test('repeated words in different sentences should be highlighted in their respective locations', () => {
+            // Create a simple HTML with "of" appearing in multiple sentences
+            const testHtml = `
+                <html><body>
+                    <p id="p1">The end of the beginning.</p>
+                    <p id="p2">A tale of two cities.</p>
+                    <p id="p3">Best of times.</p>
+                </body></html>
+            `;
+            const testDom = new JSDOM(testHtml);
+            const testDoc = testDom.window.document;
+
+            // Set up globals for this test
+            const origDoc = global.document;
+            const origWindow = global.window;
+            global.document = testDoc as any;
+            global.window = testDom.window as any;
+
+            const sentences: GPTZeroSentence[] = [
+                { sentence: 'The end of the beginning.', generated_prob: 0.5, perplexity: 10, highlight_sentence_for_ai: false },
+                { sentence: 'A tale of two cities.', generated_prob: 0.5, perplexity: 10, highlight_sentence_for_ai: false },
+                { sentence: 'Best of times.', generated_prob: 0.5, perplexity: 10, highlight_sentence_for_ai: false },
+            ];
+
+            const result = locateSentences(testDoc, sentences);
+
+            // Restore globals
+            global.document = origDoc;
+            global.window = origWindow;
+
+            // Each sentence should have its "of" located in its own paragraph
+            // Sentence 1: "of" should be in p1
+            const ofInSentence1 = result[0].locations.find(loc => loc.word === 'of');
+            expect(ofInSentence1).toBeDefined();
+            expect(ofInSentence1!.containerElement.id).toBe('p1');
+
+            // Sentence 2: "of" should be in p2
+            const ofInSentence2 = result[1].locations.find(loc => loc.word === 'of');
+            expect(ofInSentence2).toBeDefined();
+            expect(ofInSentence2!.containerElement.id).toBe('p2');
+
+            // Sentence 3: "of" should be in p3
+            const ofInSentence3 = result[2].locations.find(loc => loc.word === 'of');
+            expect(ofInSentence3).toBeDefined();
+            expect(ofInSentence3!.containerElement.id).toBe('p3');
+        });
+
+        test('words appearing multiple times in the same sentence should all be highlighted', () => {
+            const testHtml = `
+                <html><body>
+                    <p id="p1">The cat and the dog and the bird.</p>
+                </body></html>
+            `;
+            const testDom = new JSDOM(testHtml);
+            const testDoc = testDom.window.document;
+
+            const origDoc = global.document;
+            const origWindow = global.window;
+            global.document = testDoc as any;
+            global.window = testDom.window as any;
+
+            const sentences: GPTZeroSentence[] = [
+                { sentence: 'The cat and the dog and the bird.', generated_prob: 0.5, perplexity: 10, highlight_sentence_for_ai: false },
+            ];
+
+            const result = locateSentences(testDoc, sentences);
+
+            global.document = origDoc;
+            global.window = origWindow;
+
+            // Should have locations for all words including repeated ones
+            // "The" appears 3 times, "and" appears 2 times
+            const theLocations = result[0].locations.filter(loc => loc.word.toLowerCase() === 'the');
+            const andLocations = result[0].locations.filter(loc => loc.word === 'and');
+
+            expect(theLocations.length).toBe(3);
+            expect(andLocations.length).toBe(2);
+
+            // Each "the" should have a different startOffset
+            const theOffsets = theLocations.map(loc => loc.startOffset);
+            const uniqueTheOffsets = new Set(theOffsets);
+            expect(uniqueTheOffsets.size).toBe(3);
+        });
+    });
 });

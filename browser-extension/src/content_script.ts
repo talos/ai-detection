@@ -1,5 +1,5 @@
 import type { DetectionResult, SentenceScore, Capture, StorageData, DetectAIResponse, WordLocation, SentenceWithLocations } from './types';
-import { locateSentences } from './highlight';
+import { locateSentences, type LocateSentencesOptions } from './highlight';
 
 declare const browser: typeof chrome;
 
@@ -7,6 +7,8 @@ const MAX_CHARS = 20000;
 let isActive = false;
 let hoveredElement: HTMLElement | null = null;
 let activeHighlights: HTMLElement[] = [];
+let lastAnalyzedElement: HTMLElement | null = null;
+let lastSelectionRange: Range | null = null;
 
 // ============ API Functions ============
 async function getActiveProvider(): Promise<{ providerId: string; providerName: string }> {
@@ -127,10 +129,18 @@ interface HighlightLocation extends WordLocation {
 }
 
 function highlightResults(result: DetectionResult): void {
+  const options: LocateSentencesOptions = {};
+
+  if (lastSelectionRange) {
+    options.range = lastSelectionRange;
+  } else if (lastAnalyzedElement) {
+    options.rootElement = lastAnalyzedElement;
+  }
+
   const locatedSentences = locateSentences(document, result.sentences.map(s => ({
     sentence: s.sentence,
     generated_prob: 1 - s.score
-  })));
+  })), Object.keys(options).length > 0 ? options : undefined);
 
   const allLocations: HighlightLocation[] = [];
   for (const sentenceResult of locatedSentences) {
@@ -537,7 +547,9 @@ async function onClick(e: MouseEvent): Promise<void> {
 
   deactivate();
 
-  const text = (e.target as HTMLElement).textContent || '';
+  lastAnalyzedElement = e.target as HTMLElement;
+  lastSelectionRange = null; // Clear any previous selection range
+  const text = lastAnalyzedElement.textContent || '';
   await analyzeText(text);
 }
 
@@ -573,6 +585,9 @@ browser.runtime.onMessage.addListener(async (message: { action: string; result?:
 
     if (selection && selection.rangeCount > 0 && selection.toString().trim()) {
       const text = selection.toString();
+      // Clone the range before clearing selection so we can use it for highlighting
+      lastSelectionRange = selection.getRangeAt(0).cloneRange();
+      lastAnalyzedElement = null; // Use range instead of element for selections
       await analyzeText(text);
       selection.removeAllRanges();
     } else if (activeHighlights.length > 0) {

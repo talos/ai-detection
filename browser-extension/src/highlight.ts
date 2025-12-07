@@ -32,6 +32,22 @@ function getTextNodes(node: Node): Text[] {
 }
 
 /**
+ * Get text nodes that intersect with a Range
+ */
+function getTextNodesInRange(range: Range): Text[] {
+  const ancestor = range.commonAncestorContainer;
+  const root = ancestor.nodeType === Node.ELEMENT_NODE ? ancestor : ancestor.parentElement;
+  if (!root) return [];
+
+  const allNodes = getTextNodes(root);
+
+  // Filter to only nodes that intersect with the range
+  return allNodes.filter(textNode => {
+    return range.intersectsNode(textNode);
+  });
+}
+
+/**
  * Get the closest meaningful container element for a text node
  */
 function getContainerElement(textNode: Text): Element {
@@ -190,12 +206,52 @@ function findWordInTextNodes(
 }
 
 /**
- * Locate sentences from GPTZero response in the HTML DOM
+ * Create a unique key for a word location to track used positions
+ * Uses a WeakMap to assign unique IDs to text nodes
  */
-export function locateSentences(doc: Document, sentences: GPTZeroSentence[]): SentenceWithLocations[] {
-  const textNodes = getTextNodes(doc.body);
+const textNodeIds = new WeakMap<Text, number>();
+let nextTextNodeId = 0;
+
+function getTextNodeId(node: Text): number {
+  let id = textNodeIds.get(node);
+  if (id === undefined) {
+    id = nextTextNodeId++;
+    textNodeIds.set(node, id);
+  }
+  return id;
+}
+
+function locationKey(loc: WordLocation): string {
+  const nodeId = getTextNodeId(loc.textNode);
+  return `${nodeId}:${loc.startOffset}:${loc.endOffset}`;
+}
+
+export interface LocateSentencesOptions {
+  rootElement?: Element;
+  range?: Range;
+}
+
+/**
+ * Locate sentences from GPTZero response in the HTML DOM
+ * @param doc - The document to search in
+ * @param sentences - Array of sentences from GPTZero
+ * @param options - Optional constraints: rootElement or range to limit search scope
+ */
+export function locateSentences(doc: Document, sentences: GPTZeroSentence[], options?: LocateSentencesOptions): SentenceWithLocations[] {
+  let textNodes: Text[];
+
+  if (options?.range) {
+    textNodes = getTextNodesInRange(options.range);
+  } else if (options?.rootElement) {
+    textNodes = getTextNodes(options.rootElement);
+  } else {
+    textNodes = getTextNodes(doc.body);
+  }
   const textNodeCache = new Map<Text, string>();
   const results: SentenceWithLocations[] = [];
+
+  // Track which word positions have been used globally across all sentences
+  const usedLocations = new Set<string>();
 
   for (const sentenceObj of sentences) {
     const { sentence, generated_prob } = sentenceObj;
@@ -205,8 +261,16 @@ export function locateSentences(doc: Document, sentences: GPTZeroSentence[]): Se
     for (const { word } of words) {
       const wordMatches = findWordInTextNodes(textNodes, word, textNodeCache);
 
-      if (wordMatches.length > 0) {
-        locations.push(wordMatches[0]);
+      // Find the first match that hasn't been used yet
+      const unusedMatch = wordMatches.find(match => {
+        const key = locationKey(match);
+        return !usedLocations.has(key);
+      });
+
+      if (unusedMatch) {
+        const key = locationKey(unusedMatch);
+        usedLocations.add(key);
+        locations.push(unusedMatch);
       }
     }
 
