@@ -1,24 +1,30 @@
-/**
- * @jest-environment jsdom
- */
-const fs = require('fs');
-const path = require('path');
-
-// Load the implementation
-const { locateSentences } = require('../src/firefox/highlight.js');
+import { describe, test, expect, beforeAll } from 'bun:test';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { JSDOM } from 'jsdom';
+import { locateSentences } from '../src/highlight';
+import type { GPTZeroSentence } from '../src/types';
 
 // Load fixtures
-const fixturesDir = path.join(__dirname, 'fixtures');
-const htmlContent = fs.readFileSync(path.join(fixturesDir, 'self_hosting_photos.html'), 'utf-8');
-const gptzeroResponse = JSON.parse(fs.readFileSync(path.join(fixturesDir, 'gptzero_response.json'), 'utf-8'));
+const fixturesDir = join(__dirname, 'fixtures');
+const htmlContent = readFileSync(join(fixturesDir, 'self_hosting_photos.html'), 'utf-8');
+const gptzeroResponse = JSON.parse(readFileSync(join(fixturesDir, 'gptzero_response.json'), 'utf-8')) as { sentences: GPTZeroSentence[] };
 
 describe('Sentence Location in HTML', () => {
-    let doc;
+    let doc: Document;
 
     beforeAll(() => {
-        // Parse the HTML fixture into a DOM
-        document.body.innerHTML = htmlContent;
-        doc = document;
+        // Parse the HTML fixture into a DOM using jsdom
+        const dom = new JSDOM(htmlContent);
+        doc = dom.window.document;
+
+        // Set up global DOM objects for the module
+        global.document = doc as any;
+        global.window = dom.window as any;
+        global.Node = dom.window.Node as any;
+        global.NodeFilter = dom.window.NodeFilter as any;
+        global.Text = dom.window.Text as any;
+        global.Element = dom.window.Element as any;
     });
 
     describe('locateSentences returns valid structure', () => {
@@ -108,7 +114,7 @@ describe('Sentence Location in HTML', () => {
 
             result.forEach(item => {
                 item.locations.forEach(loc => {
-                    expect(loc.textNode).toBeInstanceOf(Text);
+                    expect(loc.textNode.nodeType).toBe(3); // TEXT_NODE
                     expect(typeof loc.startOffset).toBe('number');
                     expect(typeof loc.endOffset).toBe('number');
                     expect(loc.startOffset).toBeGreaterThanOrEqual(0);
@@ -123,7 +129,7 @@ describe('Sentence Location in HTML', () => {
 
             result.forEach(item => {
                 item.locations.forEach(loc => {
-                    expect(loc.containerElement).toBeInstanceOf(Element);
+                    expect(loc.containerElement.nodeType).toBe(1); // ELEMENT_NODE
                     // Container should be an ancestor of the text node
                     expect(loc.containerElement.contains(loc.textNode)).toBe(true);
                 });
@@ -135,7 +141,7 @@ describe('Sentence Location in HTML', () => {
 
             result.forEach(item => {
                 item.locations.forEach(loc => {
-                    const extractedText = loc.textNode.textContent.substring(loc.startOffset, loc.endOffset);
+                    const extractedText = loc.textNode.textContent!.substring(loc.startOffset, loc.endOffset);
                     const normalizedExtracted = extractedText.toLowerCase().replace(/[.,!?;:'"()\-\s]/g, '');
                     const normalizedWord = loc.word.toLowerCase().replace(/[.,!?;:'"()\-\s]/g, '');
                     // The extracted text should contain the word (allowing for punctuation)
@@ -192,7 +198,7 @@ describe('Sentence Location in HTML', () => {
             const step1 = gptzeroResponse.sentences.find(s => s.sentence === 'Step 1.');
             const hardware = gptzeroResponse.sentences.find(s => s.sentence === 'Hardware');
 
-            const result = locateSentences(doc, [step1, hardware]);
+            const result = locateSentences(doc, [step1!, hardware!]);
 
             // Both should be locatable
             expect(result[0].locations.length).toBeGreaterThan(0);
@@ -217,7 +223,7 @@ describe('Sentence Location in HTML', () => {
         test('should handle character differences like "Read more -" vs "Read more →"', () => {
             // GPTZero returns "Read more -" but HTML has "Read more →"
             const readMoreSentence = gptzeroResponse.sentences.find(s => s.sentence === 'Read more -');
-            const result = locateSentences(doc, [readMoreSentence]);
+            const result = locateSentences(doc, [readMoreSentence!]);
 
             // Should still find "Read more" portion
             expect(result[0].locations.length).toBeGreaterThan(0);

@@ -114,11 +114,16 @@ function findWordInTextNodes(
     }
 
     const searchTerms = [strippedWord];
-    if (strippedWord !== noHyphenWord) {
+    if (strippedWord !== noHyphenWord && noHyphenWord.length > 0) {
       searchTerms.push(noHyphenWord);
     }
 
     for (const searchTerm of searchTerms) {
+      // Skip empty search terms
+      if (searchTerm.length === 0) {
+        continue;
+      }
+
       let searchPos = 0;
       while (searchPos < normalizedContent.length) {
         const foundIndex = normalizedContent.indexOf(searchTerm, searchPos);

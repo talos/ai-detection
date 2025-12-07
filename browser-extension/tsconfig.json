@@ -10,10 +10,9 @@
     "resolveJsonModule": true,
     "declaration": false,
     "outDir": "./dist",
-    "rootDir": "./src",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "types": ["bun-types"]
+    "types": ["bun-types", "@types/chrome"]
   },
-  "include": ["src/**/*.ts", "build.ts"],
+  "include": ["src/**/*.ts", "build.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
