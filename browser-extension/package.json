@@ -1,0 +1,17 @@
+{
+  "name": "ai-content-detector",
+  "version": "0.1.0",
+  "description": "Browser extension to detect AI-generated content",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build.ts",
+    "watch": "bun run build.ts --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "bun-types": "latest",
+    "typescript": "^5.3.0"
+  }
+}
