@@ -1,6 +1,16 @@
 // Browser extension API types (Firefox WebExtensions)
 declare const browser: typeof chrome;
 
+// Usage stats types
+export interface UsageStats {
+  used: number;
+  total: number | null; // null for unlimited/metered plans
+  unit: string; // 'words', 'credits', etc.
+  cycleStart: Date | null;
+  cycleEnd: Date | null;
+  plan: string | null;
+}
+
 // Provider types
 export interface Provider {
   id: string;
@@ -8,6 +18,8 @@ export interface Provider {
   keyPlaceholder: string;
   buildRequest(text: string, apiKey: string): { url: string; options: RequestInit };
   parseResponse(json: unknown): SentenceScore[];
+  // Optional: Get usage statistics for this provider
+  getUsageStats?(apiKey: string): Promise<UsageStats>;
 }
 
 export interface SentenceScore {

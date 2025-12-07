@@ -106,12 +106,48 @@
     .settings-link a {
       color: #4a90d9;
     }
+    .usage-bar-container {
+      margin-top: 6px;
+      display: none;
+    }
+    .usage-bar-container.visible {
+      display: block;
+    }
+    .usage-bar {
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .usage-bar-fill {
+      height: 100%;
+      background: #28a745;
+      transition: width 0.3s ease, background-color 0.3s ease;
+    }
+    .usage-bar-fill.warning {
+      background: #ffc107;
+    }
+    .usage-bar-fill.danger {
+      background: #dc3545;
+    }
+    .usage-bar-text {
+      font-size: 10px;
+      color: #888;
+      margin-top: 2px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
   <div class="field">
     <label>Provider</label>
     <select id="provider"></select>
+    <div id="usageBarContainer" class="usage-bar-container">
+      <div class="usage-bar">
+        <div id="usageBarFill" class="usage-bar-fill" style="width: 100%"></div>
+      </div>
+      <div id="usageBarText" class="usage-bar-text"></div>
+    </div>
   </div>
 
   <button id="analyze">Analyze Selection</button>

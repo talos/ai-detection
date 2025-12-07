@@ -1,7 +1,13 @@
-import type { Capture, StorageData, ProviderInfo } from './types';
+import type { Capture, StorageData, ProviderInfo, UsageStats } from './types';
 import { getProvider, getProviderList } from './providers';
 
 declare const browser: typeof chrome;
+
+interface UsageStatsResponse {
+  success: boolean;
+  stats?: UsageStats;
+  error?: string;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   const providerSelect = document.getElementById('provider') as HTMLSelectElement;
@@ -9,6 +15,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const status = document.getElementById('status') as HTMLDivElement;
   const openSettings = document.getElementById('openSettings') as HTMLAnchorElement;
   const historyList = document.getElementById('historyList') as HTMLDivElement;
+  const usageBarContainer = document.getElementById('usageBarContainer') as HTMLDivElement;
+  const usageBarFill = document.getElementById('usageBarFill') as HTMLDivElement;
+  const usageBarText = document.getElementById('usageBarText') as HTMLDivElement;
 
   // Populate provider dropdown
   const providerList = getProviderList();
@@ -79,6 +88,73 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderHistory();
 
+  // Usage stats display
+  function formatNumber(n: number): string {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return n.toString();
+  }
+
+  function formatDate(date: Date): string {
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
+
+  async function updateUsageStats(): Promise<void> {
+    const response = await browser.runtime.sendMessage({ action: 'getUsageStats' }) as UsageStatsResponse;
+
+    if (!response.success || !response.stats) {
+      usageBarContainer.classList.remove('visible');
+      return;
+    }
+
+    const stats = response.stats;
+
+    // Handle unlimited plans (total is null)
+    if (stats.total === null) {
+      usageBarContainer.classList.add('visible');
+      usageBarFill.style.width = '100%';
+      usageBarFill.className = 'usage-bar-fill';
+      usageBarText.textContent = `${formatNumber(stats.used)} ${stats.unit} used (unlimited)`;
+
+      // Build tooltip
+      let tooltip = `Plan: ${stats.plan || 'Unknown'}\nUsed: ${stats.used.toLocaleString()} ${stats.unit}`;
+      if (stats.cycleStart && stats.cycleEnd) {
+        tooltip += `\nCycle: ${formatDate(new Date(stats.cycleStart))} - ${formatDate(new Date(stats.cycleEnd))}`;
+      }
+      usageBarContainer.title = tooltip;
+      return;
+    }
+
+    // Calculate percentage remaining
+    const remaining = stats.total - stats.used;
+    const percentRemaining = (remaining / stats.total) * 100;
+
+    usageBarContainer.classList.add('visible');
+    usageBarFill.style.width = `${percentRemaining}%`;
+
+    // Color based on remaining percentage
+    usageBarFill.classList.remove('warning', 'danger');
+    if (percentRemaining <= 10) {
+      usageBarFill.classList.add('danger');
+    } else if (percentRemaining <= 30) {
+      usageBarFill.classList.add('warning');
+    }
+
+    usageBarText.textContent = `${formatNumber(remaining)} ${stats.unit} left`;
+
+    // Build tooltip
+    let tooltip = `Plan: ${stats.plan || 'Unknown'}`;
+    tooltip += `\nUsed: ${stats.used.toLocaleString()} / ${stats.total.toLocaleString()} ${stats.unit}`;
+    tooltip += `\nRemaining: ${remaining.toLocaleString()} ${stats.unit} (${percentRemaining.toFixed(1)}%)`;
+    if (stats.cycleStart && stats.cycleEnd) {
+      tooltip += `\nCycle: ${formatDate(new Date(stats.cycleStart))} - ${formatDate(new Date(stats.cycleEnd))}`;
+    }
+    usageBarContainer.title = tooltip;
+  }
+
+  // Load usage stats on startup
+  updateUsageStats();
+
   // Switch provider immediately on change
   providerSelect.addEventListener('change', async () => {
     const newProviderId = providerSelect.value;
@@ -90,6 +166,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       status.className = 'status';
     }
+
+    // Refresh usage stats for new provider
+    updateUsageStats();
   });
 
   // Analyze button triggers selection mode

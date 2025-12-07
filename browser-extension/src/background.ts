@@ -113,5 +113,30 @@ browser.runtime.onMessage.addListener((
       sendResponse({ providerId, providerName: provider.name });
     });
     return true;
+  } else if (message.action === 'getUsageStats') {
+    browser.storage.local.get(['providerId', 'apiKeys']).then(async (storage: StorageData) => {
+      const providerId = storage.providerId || 'sapling';
+      const apiKeys = storage.apiKeys || {};
+      const apiKey = apiKeys[providerId];
+      const provider = getProvider(providerId);
+
+      if (!apiKey) {
+        sendResponse({ success: false, error: 'No API key configured' });
+        return;
+      }
+
+      if (!provider.getUsageStats) {
+        sendResponse({ success: false, error: 'Provider does not support usage stats' });
+        return;
+      }
+
+      try {
+        const stats = await provider.getUsageStats(apiKey);
+        sendResponse({ success: true, stats });
+      } catch (err) {
+        sendResponse({ success: false, error: (err as Error).message });
+      }
+    });
+    return true;
   }
 });
