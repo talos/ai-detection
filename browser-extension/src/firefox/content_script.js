@@ -5,6 +5,7 @@
     const MAX_CHARS = 20000;
     let isActive = false;
     let hoveredElement = null;
+    let activeHighlights = []; // Track highlighted elements for cleanup
 
     // ============ API Functions ============
     async function getActiveProvider() {
@@ -97,6 +98,121 @@
     function hideLoader() {
         const loader = document.getElementById('ai-detect-loader');
         if (loader) loader.remove();
+    }
+
+    // ============ Highlighting Functions ============
+    function getHighlightColor(generatedProb) {
+        // generatedProb is probability of AI-generated (0-1)
+        // Higher = more likely AI, should be more red
+        // Lower = more likely human, should be more green
+        if (generatedProb > 0.7) {
+            return 'rgba(220, 53, 69, 0.3)'; // Red - likely AI
+        } else if (generatedProb > 0.4) {
+            return 'rgba(255, 193, 7, 0.3)'; // Yellow - mixed
+        } else {
+            return 'rgba(40, 167, 69, 0.3)'; // Green - likely human
+        }
+    }
+
+    function clearHighlights() {
+        for (const mark of activeHighlights) {
+            // Replace mark with its text content
+            const textNode = document.createTextNode(mark.textContent);
+            mark.parentNode.replaceChild(textNode, mark);
+        }
+        activeHighlights = [];
+        // Normalize text nodes that were split
+        document.body.normalize();
+    }
+
+    function highlightResults(result) {
+        // Use locateSentences from highlight.js to find text in DOM
+        const locatedSentences = locateSentences(document, result.sentences.map(s => ({
+            sentence: s.sentence,
+            generated_prob: 1 - s.score // Convert human score to AI probability
+        })));
+
+        // Collect ALL word locations with their colors/tooltips
+        const allLocations = [];
+        for (const sentenceResult of locatedSentences) {
+            const { locations, generated_prob } = sentenceResult;
+            if (!locations || locations.length === 0) continue;
+
+            const color = getHighlightColor(generated_prob);
+            const tooltip = `AI probability: ${(generated_prob * 100).toFixed(1)}%`;
+
+            for (const loc of locations) {
+                allLocations.push({
+                    ...loc,
+                    color,
+                    tooltip
+                });
+            }
+        }
+
+        // Group by text node
+        const nodeGroups = new Map();
+        for (const loc of allLocations) {
+            if (!nodeGroups.has(loc.textNode)) {
+                nodeGroups.set(loc.textNode, []);
+            }
+            nodeGroups.get(loc.textNode).push(loc);
+        }
+
+        // Process each text node by rebuilding it with highlights
+        // This avoids issues with surroundContents invalidating references
+        for (const [textNode, locs] of nodeGroups) {
+            if (!textNode.parentNode) continue;
+
+            // Sort by startOffset ascending for reconstruction
+            locs.sort((a, b) => a.startOffset - b.startOffset);
+
+            // Remove overlapping/duplicate ranges
+            const cleanedLocs = [];
+            let lastEnd = -1;
+            for (const loc of locs) {
+                if (loc.startOffset >= lastEnd) {
+                    cleanedLocs.push(loc);
+                    lastEnd = loc.endOffset;
+                }
+            }
+
+            // Build a document fragment with alternating text and highlights
+            const fragment = document.createDocumentFragment();
+            const fullText = textNode.textContent;
+            let currentPos = 0;
+
+            for (const loc of cleanedLocs) {
+                // Add any text before this highlight
+                if (loc.startOffset > currentPos) {
+                    fragment.appendChild(document.createTextNode(fullText.substring(currentPos, loc.startOffset)));
+                }
+
+                // Add the highlighted word
+                const mark = document.createElement('mark');
+                mark.className = 'ai-detect-highlight';
+                mark.style.cssText = `
+                    background-color: ${loc.color};
+                    padding: 0 2px;
+                    border-radius: 2px;
+                    cursor: help;
+                `;
+                mark.title = loc.tooltip;
+                mark.textContent = fullText.substring(loc.startOffset, loc.endOffset);
+                fragment.appendChild(mark);
+                activeHighlights.push(mark);
+
+                currentPos = loc.endOffset;
+            }
+
+            // Add any remaining text after the last highlight
+            if (currentPos < fullText.length) {
+                fragment.appendChild(document.createTextNode(fullText.substring(currentPos)));
+            }
+
+            // Replace the original text node with the fragment
+            textNode.parentNode.replaceChild(fragment, textNode);
+        }
     }
 
     // ============ Modal Functions ============
@@ -309,6 +425,42 @@
             }
         };
 
+        const highlightBtn = document.createElement('button');
+        highlightBtn.textContent = 'Highlight in Page';
+        highlightBtn.style.cssText = `
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        highlightBtn.onclick = () => {
+            clearHighlights();
+            highlightResults(result);
+            overlay.remove();
+            showToast('Sentences highlighted in page. Click extension icon to clear.');
+        };
+
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Clear Highlights';
+        clearBtn.style.cssText = `
+            padding: 8px 16px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        clearBtn.onclick = () => {
+            clearHighlights();
+            showToast('Highlights cleared');
+        };
+
+        footer.appendChild(highlightBtn);
+        footer.appendChild(clearBtn);
         footer.appendChild(copyBtn);
         footer.appendChild(viewRawBtn);
 
@@ -340,6 +492,31 @@
         return div.innerHTML;
     }
 
+    // ============ Capture Storage ============
+    async function saveCapture(result, text) {
+        const capture = {
+            id: Date.now().toString(),
+            url: window.location.href,
+            title: document.title,
+            timestamp: new Date().toISOString(),
+            result: result,
+            text: text
+        };
+
+        // Get existing captures
+        const storage = await browser.storage.local.get(['captures']);
+        const captures = storage.captures || [];
+
+        // Add new capture at the beginning, limit to 50 most recent
+        captures.unshift(capture);
+        if (captures.length > 50) {
+            captures.pop();
+        }
+
+        await browser.storage.local.set({ captures });
+        return capture;
+    }
+
     // ============ Analysis Function ============
     async function analyzeText(text) {
         const trimmedText = text.trim();
@@ -360,6 +537,7 @@
         try {
             const result = await detectAIContent(trimmedText);
             hideLoader();
+            await saveCapture(result, trimmedText);
             showModal(result, trimmedText);
         } catch (err) {
             hideLoader();
@@ -442,11 +620,21 @@
                 const text = selection.toString();
                 await analyzeText(text);
                 selection.removeAllRanges();
+            } else if (activeHighlights.length > 0) {
+                // Clear existing highlights first
+                clearHighlights();
+                showToast('Highlights cleared');
             } else if (isActive) {
                 deactivate();
             } else {
                 activate();
             }
+        } else if (message.action === 'clearHighlights') {
+            clearHighlights();
+        } else if (message.action === 'openCapture') {
+            // Reopen a saved capture
+            const { result, text } = message;
+            showModal(result, text);
         }
     });
 })();
