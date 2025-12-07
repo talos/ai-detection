@@ -28,6 +28,7 @@ const providers: Record<string, Provider> = {
     id: 'sapling',
     name: 'Sapling AI',
     keyPlaceholder: 'Enter Sapling API key',
+    apiKeyUrl: 'https://sapling.ai/api_settings',
 
     buildRequest(text: string, apiKey: string) {
       return {
@@ -54,6 +55,7 @@ const providers: Record<string, Provider> = {
     id: 'gptzero',
     name: 'GPTZero',
     keyPlaceholder: 'Enter GPTZero API key',
+    apiKeyUrl: 'https://app.gptzero.me/api',
 
     buildRequest(text: string, apiKey: string) {
       return {

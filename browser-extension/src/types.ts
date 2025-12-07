@@ -16,6 +16,7 @@ export interface Provider {
   id: string;
   name: string;
   keyPlaceholder: string;
+  apiKeyUrl: string; // URL where users can get an API key
   buildRequest(text: string, apiKey: string): { url: string; options: RequestInit };
   parseResponse(json: unknown): SentenceScore[];
   // Optional: Get usage statistics for this provider

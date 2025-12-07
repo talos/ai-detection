@@ -136,6 +136,33 @@
       margin-top: 2px;
       text-align: right;
     }
+    .api-key-setup {
+      display: none;
+    }
+    .api-key-setup.visible {
+      display: block;
+    }
+    .api-key-setup input {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+      margin-bottom: 8px;
+    }
+    .api-key-setup .get-key-link {
+      display: block;
+      font-size: 11px;
+      color: #4a90d9;
+      margin-bottom: 8px;
+    }
+    .api-key-setup button {
+      background: #28a745;
+    }
+    .api-key-setup button:hover {
+      background: #218838;
+    }
   </style>
 </head>
 <body>
@@ -148,6 +175,12 @@
       </div>
       <div id="usageBarText" class="usage-bar-text"></div>
     </div>
+  </div>
+
+  <div id="apiKeySetup" class="api-key-setup">
+    <a id="getKeyLink" class="get-key-link" href="#" target="_blank">Get an API key</a>
+    <input type="password" id="apiKeyInput" placeholder="Enter API key">
+    <button id="saveApiKey">Save API Key</button>
   </div>
 
   <button id="analyze">Analyze Selection</button>

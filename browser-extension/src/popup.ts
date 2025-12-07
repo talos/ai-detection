@@ -18,6 +18,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const usageBarContainer = document.getElementById('usageBarContainer') as HTMLDivElement;
   const usageBarFill = document.getElementById('usageBarFill') as HTMLDivElement;
   const usageBarText = document.getElementById('usageBarText') as HTMLDivElement;
+  const apiKeySetup = document.getElementById('apiKeySetup') as HTMLDivElement;
+  const apiKeyInput = document.getElementById('apiKeyInput') as HTMLInputElement;
+  const saveApiKeyButton = document.getElementById('saveApiKey') as HTMLButtonElement;
+  const getKeyLink = document.getElementById('getKeyLink') as HTMLAnchorElement;
 
   // Populate provider dropdown
   const providerList = getProviderList();
@@ -31,9 +35,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load current provider and captures
   const storage = await browser.storage.local.get(['providerId', 'apiKeys', 'captures']) as StorageData;
   const currentProviderId = storage.providerId || 'sapling';
-  const apiKeys = storage.apiKeys || {};
+  let apiKeys = storage.apiKeys || {};
   const captures = storage.captures || [];
   providerSelect.value = currentProviderId;
+
+  // Update UI based on whether API key exists for current provider
+  function updateApiKeyUI(providerId: string): void {
+    const provider = getProvider(providerId);
+    const hasKey = !!apiKeys[providerId];
+
+    if (hasKey) {
+      apiKeySetup.classList.remove('visible');
+      analyzeButton.style.display = 'block';
+      status.className = 'status';
+    } else {
+      apiKeySetup.classList.add('visible');
+      analyzeButton.style.display = 'none';
+      apiKeyInput.placeholder = provider.keyPlaceholder;
+      getKeyLink.href = provider.apiKeyUrl;
+      getKeyLink.textContent = `Get a ${provider.name} API key`;
+      status.className = 'status';
+    }
+  }
+
+  // Initial UI update
+  updateApiKeyUI(currentProviderId);
 
   // Display capture history
   function formatTimestamp(isoString: string): string {
@@ -160,26 +186,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     const newProviderId = providerSelect.value;
     await browser.storage.local.set({ providerId: newProviderId });
 
-    if (!apiKeys[newProviderId]) {
-      status.textContent = `No API key for ${getProvider(newProviderId).name}`;
-      status.className = 'status error';
-    } else {
-      status.className = 'status';
-    }
+    // Update UI for new provider
+    updateApiKeyUI(newProviderId);
+    apiKeyInput.value = '';
 
     // Refresh usage stats for new provider
     updateUsageStats();
   });
 
-  // Analyze button triggers selection mode
-  analyzeButton.addEventListener('click', async () => {
+  // Save API key
+  saveApiKeyButton.addEventListener('click', async () => {
     const providerId = providerSelect.value;
-    if (!apiKeys[providerId]) {
-      status.textContent = `Set API key in settings first`;
+    const newKey = apiKeyInput.value.trim();
+
+    if (!newKey) {
+      status.textContent = 'Please enter an API key';
       status.className = 'status error';
       return;
     }
 
+    // Save the key
+    apiKeys[providerId] = newKey;
+    await browser.storage.local.set({ apiKeys });
+
+    // Update UI
+    apiKeyInput.value = '';
+    updateApiKeyUI(providerId);
+    updateUsageStats();
+
+    status.textContent = 'API key saved!';
+    status.className = 'status';
+    status.style.display = 'block';
+    status.style.background = '#d4edda';
+    status.style.color = '#155724';
+    setTimeout(() => {
+      status.style.display = '';
+      status.style.background = '';
+      status.style.color = '';
+      status.className = 'status';
+    }, 2000);
+  });
+
+  // Analyze button triggers selection mode
+  analyzeButton.addEventListener('click', async () => {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
       await browser.tabs.sendMessage(tabs[0].id, { action: 'toggle' });
