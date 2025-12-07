@@ -142,7 +142,9 @@ function highlightResults(result: DetectionResult): void {
     generated_prob: 1 - s.score
   })), Object.keys(options).length > 0 ? options : undefined);
 
-  const allLocations: HighlightLocation[] = [];
+  // First, merge locations within each sentence by text node
+  // This creates one span per sentence per text node
+  const sentenceSpans: HighlightLocation[] = [];
   for (const sentenceResult of locatedSentences) {
     const { locations, generated_prob } = sentenceResult;
     if (!locations || locations.length === 0) continue;
@@ -150,17 +152,34 @@ function highlightResults(result: DetectionResult): void {
     const color = getHighlightColor(generated_prob);
     const tooltip = `AI probability: ${(generated_prob * 100).toFixed(1)}%`;
 
+    // Group locations by text node within this sentence
+    const nodeMap = new Map<Text, WordLocation[]>();
     for (const loc of locations) {
-      allLocations.push({
-        ...loc,
+      if (!nodeMap.has(loc.textNode)) {
+        nodeMap.set(loc.textNode, []);
+      }
+      nodeMap.get(loc.textNode)!.push(loc);
+    }
+
+    // For each text node, create one span from min start to max end
+    for (const [textNode, nodeLocs] of nodeMap) {
+      const minStart = Math.min(...nodeLocs.map(l => l.startOffset));
+      const maxEnd = Math.max(...nodeLocs.map(l => l.endOffset));
+      sentenceSpans.push({
+        word: '', // Not used for merged spans
+        textNode,
+        startOffset: minStart,
+        endOffset: maxEnd,
+        containerElement: nodeLocs[0].containerElement,
         color,
         tooltip
       });
     }
   }
 
+  // Group all spans by text node
   const nodeGroups = new Map<Text, HighlightLocation[]>();
-  for (const loc of allLocations) {
+  for (const loc of sentenceSpans) {
     if (!nodeGroups.has(loc.textNode)) {
       nodeGroups.set(loc.textNode, []);
     }
@@ -172,20 +191,22 @@ function highlightResults(result: DetectionResult): void {
 
     locs.sort((a, b) => a.startOffset - b.startOffset);
 
-    const cleanedLocs: HighlightLocation[] = [];
-    let lastEnd = -1;
+    // Handle overlapping spans from different sentences (different colors)
+    // Keep non-overlapping spans, for overlaps keep the first one
+    const mergedLocs: HighlightLocation[] = [];
     for (const loc of locs) {
-      if (loc.startOffset >= lastEnd) {
-        cleanedLocs.push(loc);
-        lastEnd = loc.endOffset;
+      const last = mergedLocs[mergedLocs.length - 1];
+      if (!last || loc.startOffset >= last.endOffset) {
+        mergedLocs.push({ ...loc });
       }
+      // Skip overlapping spans (first one wins)
     }
 
     const fragment = document.createDocumentFragment();
     const fullText = textNode.textContent || '';
     let currentPos = 0;
 
-    for (const loc of cleanedLocs) {
+    for (const loc of mergedLocs) {
       if (loc.startOffset > currentPos) {
         fragment.appendChild(document.createTextNode(fullText.substring(currentPos, loc.startOffset)));
       }
