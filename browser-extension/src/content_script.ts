@@ -31,7 +31,8 @@ async function detectAIContent(text: string): Promise<DetectionResult> {
 
   return {
     sentences: response.data!,
-    providerName: response.providerName!
+    providerName: response.providerName!,
+    rawResponse: response.rawResponse
   };
 }
 
@@ -391,7 +392,7 @@ function showModal(result: DetectionResult, text: string): void {
   };
 
   const viewRawBtn = document.createElement('button');
-  viewRawBtn.textContent = 'View Raw JSON';
+  viewRawBtn.textContent = 'View Raw API Response';
   viewRawBtn.style.cssText = `
     padding: 8px 16px;
     background: #6c757d;
@@ -406,6 +407,7 @@ function showModal(result: DetectionResult, text: string): void {
   viewRawBtn.onclick = () => {
     showingRaw = !showingRaw;
     if (showingRaw) {
+      const rawData = result.rawResponse || { note: 'No raw response available', parsedResult: result };
       list.innerHTML = `<pre style="
         background: #1e1e1e;
         color: #d4d4d4;
@@ -414,11 +416,11 @@ function showModal(result: DetectionResult, text: string): void {
         overflow-x: auto;
         font-size: 13px;
         margin: 0;
-      ">${escapeHtml(JSON.stringify(result, null, 2))}</pre>`;
+      ">${escapeHtml(JSON.stringify(rawData, null, 2))}</pre>`;
       viewRawBtn.textContent = 'View Sentences';
     } else {
       renderSentences();
-      viewRawBtn.textContent = 'View Raw JSON';
+      viewRawBtn.textContent = 'View Raw API Response';
     }
   };
 

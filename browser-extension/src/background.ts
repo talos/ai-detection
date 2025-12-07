@@ -53,6 +53,7 @@ interface DetectResult {
   sentences: SentenceScore[];
   providerId: string;
   providerName: string;
+  rawResponse: unknown;
 }
 
 async function detectAIContent(text: string): Promise<DetectResult> {
@@ -76,9 +77,10 @@ async function detectAIContent(text: string): Promise<DetectResult> {
   }
 
   const json = await response.json();
+  console.log(`[AI Detect] Raw ${providerId} response:`, JSON.stringify(json, null, 2));
   const sentences = provider.parseResponse(json);
 
-  return { sentences, providerId, providerName: provider.name };
+  return { sentences, providerId, providerName: provider.name, rawResponse: json };
 }
 
 browser.runtime.onMessage.addListener((
@@ -99,7 +101,8 @@ browser.runtime.onMessage.addListener((
           success: true,
           data: result.sentences,
           providerId: result.providerId,
-          providerName: result.providerName
+          providerName: result.providerName,
+          rawResponse: result.rawResponse
         });
       })
       .catch(err => sendResponse({ success: false, error: (err as Error).message }));

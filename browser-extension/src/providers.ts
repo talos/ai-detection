@@ -23,6 +23,30 @@ interface GPTZeroUsageResponse {
   };
 }
 
+interface ZeroGPTResponse {
+  success: boolean;
+  data: {
+    fakePercentage: number;
+    h: string[];      // AI-detected sentences
+    hi: string[];     // Human sentences
+    textWords: number;
+    aiWords: number;
+  };
+}
+
+interface ZeroGPTUsageResponse {
+  success: boolean;
+  data: {
+    totalWords: number;
+    totalAiWords: number;
+    balance: number;
+    balancePackage: {
+      allowedWords: number;
+      description: string;
+    } | null;
+  };
+}
+
 const providers: Record<string, Provider> = {
   sapling: {
     id: 'sapling',
@@ -110,6 +134,76 @@ const providers: Record<string, Provider> = {
         cycleStart: cycle_start ? new Date(cycle_start * 1000) : null,
         cycleEnd: cycle_end ? new Date(cycle_end * 1000) : null,
         plan: plan || null
+      };
+    }
+  },
+
+  zerogpt: {
+    id: 'zerogpt',
+    name: 'ZeroGPT',
+    keyPlaceholder: 'Enter ZeroGPT API key',
+    apiKeyUrl: 'https://www.zerogpt.com/my-account',
+
+    buildRequest(text: string, apiKey: string) {
+      return {
+        url: 'https://api.zerogpt.com/api/detect/detectText',
+        options: {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'ApiKey': apiKey
+          },
+          body: JSON.stringify({
+            input_text: text
+          })
+        }
+      };
+    },
+
+    parseResponse(json: unknown): SentenceScore[] {
+      const response = json as ZeroGPTResponse;
+      if (!response.success || !response.data) {
+        return [];
+      }
+
+      const { h: aiSentences, hi: humanSentences } = response.data;
+      const results: SentenceScore[] = [];
+
+      // Add AI-detected sentences with low score (0 = AI)
+      for (const sentence of aiSentences || []) {
+        results.push({ sentence, score: 0 });
+      }
+
+      // Add human sentences with high score (1 = human)
+      for (const sentence of humanSentences || []) {
+        results.push({ sentence, score: 1 });
+      }
+
+      return results;
+    },
+
+    async getUsageStats(apiKey: string): Promise<UsageStats> {
+      const response = await fetch('https://api.zerogpt.com/api/dashboard/myStats', {
+        method: 'GET',
+        headers: {
+          'ApiKey': apiKey
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch usage stats: ${response.status}`);
+      }
+
+      const json = await response.json() as ZeroGPTUsageResponse;
+      const { totalWords, balancePackage } = json.data;
+
+      return {
+        used: totalWords,
+        total: balancePackage?.allowedWords || null,
+        unit: 'words',
+        cycleStart: null,
+        cycleEnd: null,
+        plan: balancePackage?.description || null
       };
     }
   }

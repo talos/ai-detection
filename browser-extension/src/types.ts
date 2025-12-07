@@ -37,6 +37,7 @@ export interface ProviderInfo {
 export interface DetectionResult {
   sentences: SentenceScore[];
   providerName: string;
+  rawResponse?: unknown;
 }
 
 // Capture history types
@@ -90,6 +91,7 @@ export interface DetectAIResponse {
   data?: SentenceScore[];
   providerId?: string;
   providerName?: string;
+  rawResponse?: unknown;
   error?: string;
 }
 
