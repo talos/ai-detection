@@ -93,9 +93,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     for (const capture of captures.slice(0, 10)) {
       const item = document.createElement('div');
       item.className = 'history-item';
+      const providerName = capture.result?.providerName || 'Unknown';
       item.innerHTML = `
         <div class="url">${formatUrl(capture.url)}</div>
-        <div class="timestamp">${formatTimestamp(capture.timestamp)}</div>
+        <div class="timestamp">${providerName} · ${formatTimestamp(capture.timestamp)}</div>
       `;
       item.addEventListener('click', async () => {
         const tabs = await browser.tabs.query({ active: true, currentWindow: true });
