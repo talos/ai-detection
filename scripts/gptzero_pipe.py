@@ -8,9 +8,10 @@ from typing import Any, Dict, Union
 
 import aiohttp
 
-# Construct logs directory path relative to the script location
+# Construct logs directory path relative to the project root (parent of scripts/)
 SCRIPT_DIR: str = os.path.dirname(os.path.abspath(__file__))
-LOGS_DIR: str = os.path.join(SCRIPT_DIR, 'logs')
+PROJECT_DIR: str = os.path.dirname(SCRIPT_DIR)
+LOGS_DIR: str = os.path.join(PROJECT_DIR, 'logs')
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 # Configure logging

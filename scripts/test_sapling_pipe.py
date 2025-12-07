@@ -8,6 +8,11 @@ import json
 import asyncio
 from typing import Any, Dict, Union
 
+# Add scripts directory to path for imports
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, SCRIPT_DIR)
+
 # Import the functions to test
 from sapling_pipe import send_to_sapling, main
 
